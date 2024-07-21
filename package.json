@@ -7,7 +7,7 @@
     "test": "npx cucumber-js --exit && node generate-report.js"
   },
   "keywords": [],
-  "author": "",
+  "author": "NVK PAVANKUMAR",
   "license": "ISC",
   "dependencies": {
     "@cucumber/cucumber": "^10.8.0",
