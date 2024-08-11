@@ -1,8 +1,9 @@
 
-const { Given, When, Then } = require('@cucumber/cucumber');
+const { Given, When, Then, After} = require('@cucumber/cucumber');
 const { chromium } = require('playwright');
 
 let browser;
+let context;
 let page;
 
 Given('the user navigates to {string}', async function (url) {
@@ -25,7 +26,8 @@ When('the user clicks on the element with locator {string}', async function (loc
   await this.page.locator(locator).click();
 });
 
-Then('the user should see the element with role {string} and name {string}', async function (role, name) {
-  await page.getByRole(role, { name: name }).isVisible();
-  await browser.close();
+After(async function () {
+  if (browser) {
+    await browser.close();
+  }
 });

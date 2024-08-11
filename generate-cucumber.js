@@ -1,10 +1,24 @@
 const fs = require('fs');
+const path = require('path');
 
 // Read the Playwright script
-const playwrightScript = fs.readFileSync('playwright-script.js', 'utf-8');
+let playwrightScript;
+try {
+  playwrightScript = fs.readFileSync('playwright-script.js', 'utf-8');
+} catch (error) {
+  console.error('Error reading Playwright script:', error);
+  process.exit(1);
+}
 
 // Split the script by newlines to process each action separately
-const actions = playwrightScript.split(/;\r?\n/);
+const lines = playwrightScript.split(/\r?\n/);
+
+// Filter out import statements and test blocks
+const actions = lines.filter(line => 
+  !line.trim().startsWith('import') &&
+  !line.trim().startsWith('test') &&
+  line.trim().includes('page.')
+);
 
 // Function to map Playwright actions to Gherkin steps and generate step definitions
 function mapActionToStep(action) {
@@ -57,6 +71,16 @@ When('the user clicks on the element with role {string} and name {string}', asyn
 `
                 };
             }
+            if (action.includes('.isVisible()')) {
+                return {
+                    step: `Then the user should see the element with role "${role}" and name "${name}"`,
+                    definition: `
+Then('the user should see the element with role {string} and name {string}', async function (role, name) {
+  await this.page.getByRole(role, { name: name }).isVisible();
+});
+`
+                };
+            }
         }
     }
     if (action.includes('page.locator')) {
@@ -71,6 +95,16 @@ When('the user clicks on the element with locator {string}', async function (loc
 `
             };
         }
+        if (action.includes('.isVisible()')) {
+            return {
+                step: `Then the user should see the element with locator "${locator}"`,
+                definition: `
+Then('the user should see the element with locator {string}', async function (locator) {
+  await this.page.locator(locator).isVisible();
+});
+`
+            };
+        }
     }
     return null;
 }
@@ -78,20 +112,23 @@ When('the user clicks on the element with locator {string}', async function (loc
 // Generate Gherkin scenario and step definitions
 let gherkinScenario = 'Feature: User Login and Navigation\n\n  Scenario: Successful login and navigation\n';
 let stepDefinitions = `
-const { Given, When, Then } = require('@cucumber/cucumber');
+const { Given, When, Then, After} = require('@cucumber/cucumber');
 const { chromium } = require('playwright');
 
 let browser;
+let context;
 let page;
 `;
 
-// Keep track of the added step definitions
+// Keep track of the added steps to avoid duplication
 const addedSteps = new Set();
 
 actions.forEach(action => {
     const result = mapActionToStep(action);
     if (result) {
-        gherkinScenario += `    ${result.step}\n`;
+        if (!gherkinScenario.includes(result.step)) {
+            gherkinScenario += `    ${result.step}\n`;
+        }
         if (!addedSteps.has(result.definition)) {
             stepDefinitions += result.definition;
             addedSteps.add(result.definition);
@@ -99,11 +136,25 @@ actions.forEach(action => {
     }
 });
 
+// Ensure the last step is correctly processed
+const lastAction = actions[actions.length - 1];
+const lastResult = mapActionToStep(lastAction);
+if (lastResult) {
+    if (!gherkinScenario.includes(lastResult.step)) {
+        gherkinScenario += `    ${lastResult.step}\n`;
+    }
+    if (!addedSteps.has(lastResult.definition)) {
+        stepDefinitions += lastResult.definition;
+        addedSteps.add(lastResult.definition);
+    }
+}
+
 // Close the browser at the end of the tests
 stepDefinitions += `
-Then('the user should see the element with role {string} and name {string}', async function (role, name) {
-  await page.getByRole(role, { name: name }).isVisible();
-  await browser.close();
+After(async function () {
+  if (browser) {
+    await browser.close();
+  }
 });
 `;
 
@@ -111,13 +162,15 @@ try {
     fs.mkdirSync('features', { recursive: true });
     fs.mkdirSync('steps', { recursive: true });
 } catch (e) {
-    console.log('Cannot create folder ', e);
+    console.error('Cannot create folders:', e);
+    process.exit(1);
 }
 
-let fileContent = `const { Before, After, AfterStep } = require('@cucumber/cucumber');
+const hooksFileContent = `const { Before, After, AfterStep } = require('@cucumber/cucumber');
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
+
 let browser;
 let context;
 let page;
@@ -126,37 +179,55 @@ Before(async function () {
     browser = await chromium.launch({
         headless: false,
         args: ['--start-maximized']
-    }); // Launch browser
-    context = await browser.newContext({ viewport: null} ); // Set viewport
-    page = await context.newPage(); // Create a new page
-    this.page = page; // Attach page to the context
+    });
+    context = await browser.newContext({ viewport: null });
+    page = await context.newPage();
+    this.page = page;
 });
 
 After(async function () {
     if (browser) {
-        await browser.close(); // Close browser after scenario
+        await browser.close();
     }
 });
 
 AfterStep(async function (step) {
     if (!fs.existsSync('screenshots')) {
-      fs.mkdirSync('screenshots');
+        fs.mkdirSync('screenshots');
     }
-   const stepText = step.pickleStep.text.replace(/[^a-zA-Z0-9]/g, '_'); // Sanitize step text for file name
-   const filePath = path.join('screenshots', \`\${Date.now()}_\${stepText}.png\`);
+    const stepText = step.pickleStep.text.replace(/[^a-zA-Z0-9]/g, '_');
+    const filePath = path.join('screenshots', \`\${Date.now()}_\${stepText}.png\`);
     await this.page.screenshot({ path: filePath });
-    this.attach(fs.readFileSync(filePath), 'image/png'); 
-  });`;
+    this.attach(fs.readFileSync(filePath), 'image/png');
+});
+`;
 
-if (!fs.existsSync('hooks.js')) {
-    // File does not exist, create the file and write content
-    fs.writeFileSync('hooks.js', fileContent, 'utf8');
-    console.log('File created and content written.');
-} else {
-    console.log('File already exists. Content not replaced.');
+try {
+    if (!fs.existsSync('hooks.js')) {
+        fs.writeFileSync('hooks.js', hooksFileContent, 'utf8');
+        console.log('hooks.js created and content written.');
+    } else {
+        console.log('hooks.js already exists. Content not replaced.');
+    }
+} catch (error) {
+    console.error('Error writing hooks.js:', error);
+    process.exit(1);
 }
+
 // Save the Gherkin scenario to a .feature file
-fs.writeFileSync('features/generated-scenario.feature', gherkinScenario);
+try {
+    fs.writeFileSync('features/generated-scenario.feature', gherkinScenario, 'utf8');
+    console.log('Feature file created and content written.');
+} catch (error) {
+    console.error('Error writing feature file:', error);
+    process.exit(1);
+}
 
 // Save the step definitions to a steps.js file
-fs.writeFileSync('steps/steps.js', stepDefinitions);
+try {
+    fs.writeFileSync('steps/steps.js', stepDefinitions, 'utf8');
+    console.log('Step definitions file created and content written.');
+} catch (error) {
+    console.error('Error writing step definitions file:', error);
+    process.exit(1);
+}

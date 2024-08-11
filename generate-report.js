@@ -9,16 +9,17 @@ const options = {
   launchReport: true,
   metadata: {
     browser: {
-      name: 'chrome',
-      version: '91',
+      name: 'Chrome',  // Use a simple string for the name
+      version: '91'    // Use a simple string for the version
     },
     device: 'Local Test Machine',
     platform: {
       name: 'Windows',
-      version: '10',
-    },
+      version: '10'
+    }
   },
 };
 
 // Generate the HTML report
 reporter.generate(options);
+console.log('Report generated!');

@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "npx cucumber-js --exit && node generate-report.js"
+    "pretest": "node generateScript.js",
+    "test": "node generate-cucumber.js",
+    "posttest": "npx cucumber-js --exit && node generate-report.js"
   },
   "keywords": [],
   "author": "NVK PAVANKUMAR",
