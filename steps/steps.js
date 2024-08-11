@@ -1,5 +1,5 @@
 
-const { Given, When, Then, After} = require('@cucumber/cucumber');
+const { Given, When, Then, After } = require('@cucumber/cucumber');
 const { chromium } = require('playwright');
 
 let browser;
@@ -20,10 +20,6 @@ When('the user enters {string} into the input with placeholder {string}', async 
 
 When('the user clicks on the element with role {string} and name {string}', async function (role, name) {
   await this.page.getByRole(role, { name: name }).click();
-});
-
-When('the user clicks on the element with locator {string}', async function (locator) {
-  await this.page.locator(locator).click();
 });
 
 After(async function () {

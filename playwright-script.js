@@ -9,5 +9,5 @@ test('test', async ({ page }) => {
   await page.getByRole('button', { name: 'Login' }).click();
   await page.getByRole('banner').getByRole('img', { name: 'profile picture' }).click();
   await page.getByRole('menuitem', { name: 'Logout' }).click();
-  await page.locator('.orangehrm-login-branding').click();
+  await page.getByRole('img', { name: 'company-branding' }).click();
 });

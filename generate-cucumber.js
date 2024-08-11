@@ -57,6 +57,41 @@ When('the user enters {string} into the input with placeholder {string}', async 
             };
         }
     }
+    if (action.includes('page.getByLabel')) {
+        const label = action.match(/'([^']+)'/)[1];
+        if (action.includes('.click()')) {
+            return {
+                step: `When the user clicks on the input with label "${label}"`,
+                definition: `
+When('the user clicks on the input with label {string}', async function (label) {
+  await this.page.getByLabel(label).click();
+});
+`
+            };
+        }
+        if (action.includes('.fill')) {
+            const value = action.match(/\.fill\('([^']+)'/)[1];
+            return {
+                step: `When the user enters "${value}" into the input with label "${label}"`,
+                definition: `
+When('the user enters {string} into the input with label {string}', async function (value, label) {
+  await this.page.getByLabel(label).fill(value);
+});
+`
+            };
+        }
+        if (action.includes('.press')) {
+            const key = action.match(/\.press\('([^']+)'/)[1];
+            return {
+                step: `When the user presses "${key}" in the input with label "${label}"`,
+                definition: `
+When('the user presses {string} in the input with label {string}', async function (key, label) {
+  await this.page.getByLabel(label).press(key);
+});
+`
+            };
+        }
+    }
     if (action.includes('page.getByRole')) {
         const roleMatch = action.match(/getByRole\('([^']+)', \{ name: '([^']+)' \}/);
         if (roleMatch) {
@@ -81,6 +116,26 @@ Then('the user should see the element with role {string} and name {string}', asy
 `
                 };
             }
+        }
+    }
+    if (action.includes('page.getByText')) {
+        const text = action.match(/'([^']+)'/)[1];
+        if (action.includes('.click()')) {
+            return {
+                step: `When the user clicks on the element with text "${text}"`,
+                definition: `
+When('the user clicks on the element with text {string}', async function (text) {
+  // Handle cases where multiple elements are matched
+  const elements = this.page.getByText(text);
+  if (await elements.count() > 1) {
+    // You can choose the specific element by index if needed
+    await elements.nth(0).click(); // Change 0 to the appropriate index if needed
+  } else {
+    await elements.click();
+  }
+});
+`
+            };
         }
     }
     if (action.includes('page.locator')) {
@@ -112,7 +167,7 @@ Then('the user should see the element with locator {string}', async function (lo
 // Generate Gherkin scenario and step definitions
 let gherkinScenario = 'Feature: User Login and Navigation\n\n  Scenario: Successful login and navigation\n';
 let stepDefinitions = `
-const { Given, When, Then, After} = require('@cucumber/cucumber');
+const { Given, When, Then, After } = require('@cucumber/cucumber');
 const { chromium } = require('playwright');
 
 let browser;

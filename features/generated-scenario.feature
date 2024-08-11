@@ -8,4 +8,4 @@ Feature: User Login and Navigation
     When the user clicks on the element with role "button" and name "Login"
     When the user clicks on the element with role "img" and name "profile picture"
     When the user clicks on the element with role "menuitem" and name "Logout"
-    When the user clicks on the element with locator ".orangehrm-login-branding"
+    When the user clicks on the element with role "img" and name "company-branding"
